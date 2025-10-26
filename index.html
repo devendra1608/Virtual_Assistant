@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Windows Assistant</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 18px; }
+    h1 { font-size: 28px; margin-bottom: 6px; }
+    #transcript { width: 100%; height: 260px; font-size: 14px; padding: 8px; box-sizing: border-box; white-space: pre-wrap; }
+    #status { margin-top:8px; font-weight:600; color:#444; }
+    #controls { margin-top:12px; }
+    button { padding:8px 12px; margin-right:8px; }
+    #speaking { font-weight:700; color:#d9534f; margin-left:8px; }
+  </style>
+</head>
+<body>
+  <h1>Windows Assistant</h1>
+  <textarea id="transcript" readonly placeholder="Transcript and assistant responses appear here..."></textarea>
+  <div id="status">
+    Status: <span id="st">Disconnected</span>
+    <span id="speaking" style="display:none">Assistant speaking…</span>
+  </div>
+  <div id="controls">
+    <button id="startBtn">Start Mic</button>
+    <button id="stopBtn" disabled>Stop Mic</button>
+  </div>
+
+<script>
+(async () => {
+  const WS_URL = "ws://127.0.0.1:8000/ws";
+  const transcriptEl = document.getElementById("transcript");
+  const statusEl = document.getElementById("st");
+  const startBtn = document.getElementById("startBtn");
+  const stopBtn = document.getElementById("stopBtn");
+  const speakingEl = document.getElementById("speaking");
+
+  let ws = null;
+  let mediaStream = null;
+  let audioContext = null;
+  let processor = null;
+  let source = null;
+  let pauseSending = false;
+
+  function log(msg) {
+    transcriptEl.value += msg + "\n";
+    transcriptEl.scrollTop = transcriptEl.scrollHeight;
+  }
+
+  function updateStatus(speaking=false) {
+    if (speaking) {
+      statusEl.textContent = "Connected (assistant speaking)";
+      speakingEl.style.display = "inline";
+    } else {
+      statusEl.textContent = ws && ws.readyState === WebSocket.OPEN ? "Connected" : "Disconnected";
+      speakingEl.style.display = "none";
+    }
+  }
+
+  function openWS() {
+    if (ws && ws.readyState === WebSocket.OPEN) return;
+
+    ws = new WebSocket(WS_URL);
+    ws.binaryType = "arraybuffer";
+
+    ws.onopen = () => { log("[WS] Connected to backend"); updateStatus(); };
+
+    ws.onmessage = (ev) => {
+      try {
+        const obj = JSON.parse(ev.data);
+        if (obj.partial) statusEl.textContent = "Listening — partial: " + obj.partial;
+        if (obj.text) log("You: " + obj.text);
+        if (obj.response) {
+          log("Assistant: " + obj.response);
+
+          // Speak response using browser TTS
+          pauseSending = true;
+          updateStatus(true);
+          const utter = new SpeechSynthesisUtterance(obj.response);
+          utter.rate = 1;
+          utter.onend = () => { pauseSending = false; updateStatus(false); };
+          speechSynthesis.speak(utter);
+        }
+      } catch(e) { console.error("Non-JSON message", ev.data); }
+    };
+
+    ws.onclose = () => {
+      log("[WS] Disconnected");
+      pauseSending = false;
+      updateStatus();
+      ws = null;
+      setTimeout(openWS, 1000);
+    };
+
+    ws.onerror = (err) => { console.error("WebSocket error", err); ws.close(); };
+  }
+
+  function floatTo16BitPCM(floatBuffer) {
+    const l = floatBuffer.length;
+    const buffer = new ArrayBuffer(l * 2);
+    const view = new DataView(buffer);
+    let offset = 0;
+    for (let i = 0; i < l; i++, offset += 2) {
+      let s = Math.max(-1, Math.min(1, floatBuffer[i]));
+      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    }
+    return buffer;
+  }
+
+  function downsampleBuffer(buffer, sampleRate, outSampleRate = 16000) {
+    if (outSampleRate === sampleRate) return floatTo16BitPCM(buffer);
+    const ratio = sampleRate / outSampleRate;
+    const newLength = Math.round(buffer.length / ratio);
+    const result = new Float32Array(newLength);
+    let offsetRes = 0, offsetBuf = 0;
+    while (offsetRes < result.length) {
+      const nextOffsetBuf = Math.round((offsetRes + 1) * ratio);
+      let sum = 0, count = 0;
+      for (let i = offsetBuf; i < nextOffsetBuf && i < buffer.length; i++) { sum += buffer[i]; count++; }
+      result[offsetRes] = sum / Math.max(count, 1);
+      offsetRes++; offsetBuf = nextOffsetBuf;
+    }
+    return floatTo16BitPCM(result);
+  }
+
+  async function startMic() {
+    try {
+      pauseSending = false;
+      openWS();
+
+      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      source = audioContext.createMediaStreamSource(mediaStream);
+
+      processor = audioContext.createScriptProcessor(4096, 1, 1);
+      const sampleRate = audioContext.sampleRate;
+
+      processor.onaudioprocess = (e) => {
+        if (!ws || ws.readyState !== WebSocket.OPEN || pauseSending) return;
+        const inputData = e.inputBuffer.getChannelData(0);
+        ws.send(downsampleBuffer(inputData, sampleRate, 16000));
+      };
+
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+      log("[Mic] Started streaming to backend");
+    } catch (err) {
+      console.error("startMic error", err);
+      log("[Mic] Error: " + (err.message || err));
+    }
+  }
+
+  function stopMic() {
+    if (processor) { try { processor.disconnect(); } catch{} processor.onaudioprocess=null; processor=null; }
+    if (source) { try { source.disconnect(); } catch{} source=null; }
+    if (audioContext) { audioContext.close(); audioContext=null; }
+    if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream=null; }
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    pauseSending = false;
+    updateStatus();
+    log("[Mic] Stopped");
+  }
+
+  startBtn.onclick = startMic;
+  stopBtn.onclick = stopMic;
+
+  log("Ready. Click 'Start Mic' and speak commands like 'open notepad', 'open browser', or 'what time is it'.");
+})();
+</script>
+</body>
+</html>

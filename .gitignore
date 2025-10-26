@@ -1,0 +1,47 @@
+# Python virtual environment
+v_ass/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.env
+.venv
+env/
+venv/
+ENV/
+*.egg-info/
+.dist-info/
+
+# Node
+node_modules/
+package-lock.json
+
+# VSCode / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build/Logs
+build/
+dist/
+*.log
+
+# Secrets
+.env
+*.pem
+*.key
+
+# Large models (keep out of git history)
+vosk-model-en-us-0.22/
+
+# Local development
+.python-version
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
