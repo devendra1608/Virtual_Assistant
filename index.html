@@ -1,174 +1,930 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Windows Assistant</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voice Assistant</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 18px; }
-    h1 { font-size: 28px; margin-bottom: 6px; }
-    #transcript { width: 100%; height: 260px; font-size: 14px; padding: 8px; box-sizing: border-box; white-space: pre-wrap; }
-    #status { margin-top:8px; font-weight:600; color:#444; }
-    #controls { margin-top:12px; }
-    button { padding:8px 12px; margin-right:8px; }
-    #speaking { font-weight:700; color:#d9534f; margin-left:8px; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #0a0e1a 0%, #1a1f35 50%, #0a0e1a 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      position: relative;
+      overflow-x: hidden;
+      overflow-y: auto;
+      color: #fff;
+    }
+
+    body::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 50% 50%, rgba(0, 150, 255, 0.15), transparent 60%);
+      pointer-events: none;
+      animation: breathe 6s ease-in-out infinite;
+    }
+
+    body::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 20% 80%, rgba(0, 230, 180, 0.1), transparent 50%);
+      pointer-events: none;
+      animation: breathe 8s ease-in-out infinite reverse;
+    }
+
+    @keyframes breathe {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(1.05); }
+    }
+
+    .container {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      max-width: 1000px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .title {
+      font-size: 52px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #60a5fa 0%, #00e6b4 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: titleGlow 3s ease-in-out infinite;
+    }
+
+    @keyframes titleGlow {
+      0%, 100% { filter: brightness(1); }
+      50% { filter: brightness(1.3); }
+    }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 8px 20px;
+      background: rgba(30, 41, 59, 0.4);
+      border-radius: 20px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(100, 150, 255, 0.2);
+      display: inline-flex;
+      margin: 0 auto;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      position: relative;
+    }
+
+    .status-dot::before {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      border: 2px solid currentColor;
+      opacity: 0;
+    }
+
+    .status-dot.connected {
+      background-color: #00e6b4;
+      box-shadow: 0 0 20px rgba(0, 230, 180, 0.6);
+      animation: statusPulse 2s ease-in-out infinite;
+    }
+
+    .status-dot.connected::before {
+      border-color: #00e6b4;
+      animation: ripple 2s ease-in-out infinite;
+    }
+
+    .status-dot.disconnected {
+      background-color: #ff4757;
+    }
+
+    @keyframes statusPulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.1); opacity: 0.8; }
+    }
+
+    @keyframes ripple {
+      0% { transform: scale(0.8); opacity: 0; }
+      50% { transform: scale(1.5); opacity: 0.5; }
+      100% { transform: scale(2); opacity: 0; }
+    }
+
+    .status-text {
+      color: #e2e8f0;
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.3px;
+    }
+
+    .mic-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 40px;
+    }
+
+    .mic-wrapper {
+      position: relative;
+      margin-bottom: 100px;
+    }
+
+    .orb-container {
+      position: absolute;
+      inset: -60px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+
+    .orb-container.active {
+      opacity: 1;
+    }
+
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(50px);
+      animation: orbFloat 3s ease-in-out infinite;
+    }
+
+    .orb:nth-child(1) {
+      width: 240px;
+      height: 240px;
+      background: radial-gradient(circle, rgba(0, 150, 255, 0.6) 0%, transparent 70%);
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      animation-delay: 0s;
+    }
+
+    .orb:nth-child(2) {
+      width: 200px;
+      height: 200px;
+      background: radial-gradient(circle, rgba(0, 230, 180, 0.4) 0%, transparent 70%);
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      animation-delay: 1s;
+    }
+
+    .orb:nth-child(3) {
+      width: 280px;
+      height: 280px;
+      background: radial-gradient(circle, rgba(100, 150, 255, 0.3) 0%, transparent 70%);
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      animation-delay: 2s;
+    }
+
+    @keyframes orbFloat {
+      0%, 100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.8;
+      }
+      50% {
+        transform: translate(-50%, -50%) scale(1.15);
+        opacity: 1;
+      }
+    }
+
+    .mic-button {
+      position: relative;
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 0 rgba(0, 150, 255, 0);
+      z-index: 10;
+    }
+
+    .mic-button:hover {
+      transform: scale(1.08);
+    }
+
+    .mic-button:active {
+      transform: scale(0.98);
+    }
+
+    .mic-button.idle {
+      background: linear-gradient(135deg, #0096ff 0%, #00e6b4 100%);
+      box-shadow: 0 20px 60px rgba(0, 150, 255, 0.4), 0 0 60px rgba(0, 230, 180, 0.3);
+    }
+
+    .mic-button.listening {
+      background: linear-gradient(135deg, #00e6b4 0%, #00c9ff 100%);
+      box-shadow: 0 20px 80px rgba(0, 230, 180, 0.6), 0 0 100px rgba(0, 230, 180, 0.4);
+      animation: buttonPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes buttonPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+
+    .mic-icon {
+      width: 52px;
+      height: 52px;
+      stroke: white;
+      stroke-width: 2.5;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+      transition: all 0.3s ease;
+    }
+
+    .pulse-ring {
+      position: absolute;
+      inset: -20px;
+      border-radius: 50%;
+      border: 2px solid #00e6b4;
+      opacity: 0;
+    }
+
+    .pulse-ring.active {
+      animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+    }
+
+    .pulse-ring-2 {
+      position: absolute;
+      inset: -30px;
+      border-radius: 50%;
+      border: 2px solid #00c9ff;
+      opacity: 0;
+    }
+
+    .pulse-ring-2.active {
+      animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite 0.5s;
+    }
+
+    .pulse-ring-3 {
+      position: absolute;
+      inset: -40px;
+      border-radius: 50%;
+      border: 2px solid #60a5fa;
+      opacity: 0;
+    }
+
+    .pulse-ring-3.active {
+      animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite 1s;
+    }
+
+    @keyframes ping {
+      0% {
+        transform: scale(0.8);
+        opacity: 0;
+      }
+      50% {
+        opacity: 0.6;
+      }
+      100% {
+        transform: scale(1.5);
+        opacity: 0;
+      }
+    }
+
+    .waveform {
+      position: absolute;
+      bottom: -100px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      width: 400px;
+      height: 80px;
+    }
+
+    .waveform.active {
+      display: flex;
+    }
+
+    .wave-bar {
+      width: 3px;
+      height: 4px;
+      background: linear-gradient(to top, #00e6b4, #00c9ff);
+      border-radius: 10px;
+      transition: all 0.08s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 0 8px currentColor;
+      opacity: 0.4;
+    }
+
+    .wave-bar.speaking {
+      background: linear-gradient(to top, #a78bfa, #60a5fa);
+    }
+
+    .mic-hint {
+      margin-top: 24px;
+      color: #94a3b8;
+      font-size: 15px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+    }
+
+    .partial-text {
+      text-align: center;
+      margin-bottom: 28px;
+      min-height: 28px;
+      padding: 0 24px;
+    }
+
+    .partial-text span {
+      color: #00e6b4;
+      font-size: 16px;
+      font-style: italic;
+      font-weight: 500;
+      animation: textPulse 1.5s ease-in-out infinite;
+      text-shadow: 0 0 20px rgba(0, 230, 180, 0.5);
+    }
+
+    @keyframes textPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    .conversation-panel {
+      background: rgba(20, 30, 50, 0.6);
+      backdrop-filter: blur(30px);
+      border-radius: 20px;
+      border: 1px solid rgba(100, 150, 255, 0.2);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      overflow: hidden;
+    }
+
+    .conversation-header {
+      padding: 20px;
+      border-bottom: 1px solid rgba(100, 150, 255, 0.2);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(30, 41, 59, 0.3);
+    }
+
+    .conversation-icon {
+      width: 22px;
+      height: 22px;
+      stroke: #00e6b4;
+      stroke-width: 2.5;
+      fill: none;
+      filter: drop-shadow(0 0 8px rgba(0, 230, 180, 0.5));
+    }
+
+    .conversation-title {
+      font-weight: 600;
+      font-size: 17px;
+      letter-spacing: 0.3px;
+    }
+
+    .conversation-body {
+      padding: 28px;
+      height: 400px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      scroll-behavior: smooth;
+      position: relative;
+    }
+
+    .conversation-body::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    .conversation-body::-webkit-scrollbar-track {
+      background: rgba(30, 41, 59, 0.3);
+      border-radius: 5px;
+      margin: 8px 0;
+    }
+
+    .conversation-body::-webkit-scrollbar-thumb {
+      background: linear-gradient(to bottom, #00e6b4, #0096ff);
+      border-radius: 5px;
+      border: 2px solid rgba(20, 30, 50, 0.6);
+    }
+
+    .conversation-body::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(to bottom, #00ffcc, #00b3ff);
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100%;
+      color: #64748b;
+      text-align: center;
+    }
+
+    .empty-icon {
+      width: 72px;
+      height: 72px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+      opacity: 0.2;
+      margin-bottom: 20px;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+
+    .message-container {
+      display: flex;
+      margin-bottom: 20px;
+      animation: messageSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    @keyframes messageSlideIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .message-container.user {
+      justify-content: flex-end;
+    }
+
+    .message-container.assistant {
+      justify-content: flex-start;
+    }
+
+    .message {
+      max-width: 75%;
+      padding: 14px 22px;
+      border-radius: 18px;
+      font-size: 15px;
+      line-height: 1.6;
+      font-weight: 400;
+      position: relative;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+
+    .message.user {
+      background: linear-gradient(135deg, #0096ff 0%, #00c9ff 100%);
+      color: white;
+      box-shadow: 0 8px 24px rgba(0, 150, 255, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      border-bottom-right-radius: 4px;
+    }
+
+    .message.assistant {
+      background: rgba(40, 50, 70, 0.7);
+      color: #f1f5f9;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(100, 150, 255, 0.15);
+      border-bottom-left-radius: 4px;
+    }
+
+    @media (max-width: 768px) {
+      .title {
+        font-size: 40px;
+      }
+
+      .mic-button {
+        width: 120px;
+        height: 120px;
+      }
+
+      .waveform {
+        width: 280px;
+      }
+
+      .conversation-body {
+        height: 320px;
+      }
+
+      .message {
+        max-width: 85%;
+      }
+    }
   </style>
 </head>
 <body>
-  <h1>Windows Assistant</h1>
-  <textarea id="transcript" readonly placeholder="Transcript and assistant responses appear here..."></textarea>
-  <div id="status">
-    Status: <span id="st">Disconnected</span>
-    <span id="speaking" style="display:none">Assistant speaking…</span>
+  <div class="container">
+    <div class="header">
+      <h1 class="title">Voice Assistant</h1>
+      <div class="status-bar">
+        <div class="status-dot disconnected" id="statusDot"></div>
+        <p class="status-text" id="statusText">Connecting...</p>
+      </div>
+    </div>
+
+    <div class="mic-section">
+      <div class="mic-wrapper">
+        <div class="orb-container" id="orbContainer">
+          <div class="orb"></div>
+          <div class="orb"></div>
+          <div class="orb"></div>
+        </div>
+        <button class="mic-button idle" id="micButton">
+          <svg class="mic-icon" id="micIcon" viewBox="0 0 24 24">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" y1="19" x2="12" y2="23"></line>
+            <line x1="8" y1="23" x2="16" y2="23"></line>
+          </svg>
+          <div class="pulse-ring" id="pulseRing"></div>
+          <div class="pulse-ring-2" id="pulseRing2"></div>
+          <div class="pulse-ring-3" id="pulseRing3"></div>
+        </button>
+        <div class="waveform" id="waveform"></div>
+      </div>
+      <p class="mic-hint" id="micHint">Tap to start voice command</p>
+    </div>
+
+    <div class="partial-text" id="partialTextContainer">
+      <span id="partialText"></span>
+    </div>
+
+    <div class="conversation-panel">
+      <div class="conversation-header">
+        <svg class="conversation-icon" viewBox="0 0 24 24">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+        <h2 class="conversation-title">Conversation</h2>
+      </div>
+      <div class="conversation-body" id="conversationBody">
+        <div class="empty-state" id="emptyState">
+          <svg class="empty-icon" viewBox="0 0 24 24">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" y1="19" x2="12" y2="23"></line>
+            <line x1="8" y1="23" x2="16" y2="23"></line>
+          </svg>
+          <p style="font-size: 15px; font-weight: 500; margin-bottom: 12px;">Start speaking to begin your conversation</p>
+          <p style="font-size: 13px; opacity: 0.6;">Try: "open notepad", "what time is it", "open browser"</p>
+        </div>
+      </div>
+    </div>
   </div>
-  <div id="controls">
-    <button id="startBtn">Start Mic</button>
-    <button id="stopBtn" disabled>Stop Mic</button>
-  </div>
 
-<script>
-(async () => {
-  const WS_URL = "ws://127.0.0.1:8000/ws";
-  const transcriptEl = document.getElementById("transcript");
-  const statusEl = document.getElementById("st");
-  const startBtn = document.getElementById("startBtn");
-  const stopBtn = document.getElementById("stopBtn");
-  const speakingEl = document.getElementById("speaking");
+  <script>
+    (async () => {
+      const WS_URL = "ws://127.0.0.1:8000/ws";
 
-  let ws = null;
-  let mediaStream = null;
-  let audioContext = null;
-  let processor = null;
-  let source = null;
-  let pauseSending = false;
+      const statusDot = document.getElementById('statusDot');
+      const statusText = document.getElementById('statusText');
+      const micButton = document.getElementById('micButton');
+      const micIcon = document.getElementById('micIcon');
+      const micHint = document.getElementById('micHint');
+      const pulseRing = document.getElementById('pulseRing');
+      const pulseRing2 = document.getElementById('pulseRing2');
+      const pulseRing3 = document.getElementById('pulseRing3');
+      const orbContainer = document.getElementById('orbContainer');
+      const waveformContainer = document.getElementById('waveform');
+      const partialTextEl = document.getElementById('partialText');
+      const partialTextContainer = document.getElementById('partialTextContainer');
+      const conversationBody = document.getElementById('conversationBody');
+      const emptyState = document.getElementById('emptyState');
 
-  function log(msg) {
-    transcriptEl.value += msg + "\n";
-    transcriptEl.scrollTop = transcriptEl.scrollHeight;
-  }
+      let ws = null;
+      let mediaStream = null;
+      let audioContext = null;
+      let processor = null;
+      let source = null;
+      let pauseSending = false;
+      let isListening = false;
+      let isSpeaking = false;
+      let waveBars = [];
+      let waveAnimationFrame = null;
 
-  function updateStatus(speaking=false) {
-    if (speaking) {
-      statusEl.textContent = "Connected (assistant speaking)";
-      speakingEl.style.display = "inline";
-    } else {
-      statusEl.textContent = ws && ws.readyState === WebSocket.OPEN ? "Connected" : "Disconnected";
-      speakingEl.style.display = "none";
-    }
-  }
-
-  function openWS() {
-    if (ws && ws.readyState === WebSocket.OPEN) return;
-
-    ws = new WebSocket(WS_URL);
-    ws.binaryType = "arraybuffer";
-
-    ws.onopen = () => { log("[WS] Connected to backend"); updateStatus(); };
-
-    ws.onmessage = (ev) => {
-      try {
-        const obj = JSON.parse(ev.data);
-        if (obj.partial) statusEl.textContent = "Listening — partial: " + obj.partial;
-        if (obj.text) log("You: " + obj.text);
-        if (obj.response) {
-          log("Assistant: " + obj.response);
-
-          // Speak response using browser TTS
-          pauseSending = true;
-          updateStatus(true);
-          const utter = new SpeechSynthesisUtterance(obj.response);
-          utter.rate = 1;
-          utter.onend = () => { pauseSending = false; updateStatus(false); };
-          speechSynthesis.speak(utter);
+      function initWaveform() {
+        waveformContainer.innerHTML = '';
+        waveBars = [];
+        for (let i = 0; i < 60; i++) {
+          const bar = document.createElement('div');
+          bar.className = 'wave-bar';
+          waveformContainer.appendChild(bar);
+          waveBars.push(bar);
         }
-      } catch(e) { console.error("Non-JSON message", ev.data); }
-    };
+      }
 
-    ws.onclose = () => {
-      log("[WS] Disconnected");
-      pauseSending = false;
-      updateStatus();
-      ws = null;
-      setTimeout(openWS, 1000);
-    };
+      function animateWaveform() {
+        if (!isListening && !isSpeaking) {
+          waveBars.forEach(bar => {
+            bar.style.height = '4px';
+            bar.style.opacity = '0.4';
+          });
+          return;
+        }
 
-    ws.onerror = (err) => { console.error("WebSocket error", err); ws.close(); };
-  }
+        waveBars.forEach((bar, i) => {
+          const time = Date.now() / 1000;
+          const baseHeight = 4;
+          const maxHeight = isSpeaking ? 70 : 60;
 
-  function floatTo16BitPCM(floatBuffer) {
-    const l = floatBuffer.length;
-    const buffer = new ArrayBuffer(l * 2);
-    const view = new DataView(buffer);
-    let offset = 0;
-    for (let i = 0; i < l; i++, offset += 2) {
-      let s = Math.max(-1, Math.min(1, floatBuffer[i]));
-      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-    }
-    return buffer;
-  }
+          const frequency = 0.05 + (i / waveBars.length) * 0.1;
+          const wave1 = Math.sin(time * 3 + i * frequency) * 0.5 + 0.5;
+          const wave2 = Math.sin(time * 2.5 - i * frequency * 0.8) * 0.5 + 0.5;
+          const wave3 = Math.sin(time * 4.2 + i * frequency * 1.2) * 0.5 + 0.5;
 
-  function downsampleBuffer(buffer, sampleRate, outSampleRate = 16000) {
-    if (outSampleRate === sampleRate) return floatTo16BitPCM(buffer);
-    const ratio = sampleRate / outSampleRate;
-    const newLength = Math.round(buffer.length / ratio);
-    const result = new Float32Array(newLength);
-    let offsetRes = 0, offsetBuf = 0;
-    while (offsetRes < result.length) {
-      const nextOffsetBuf = Math.round((offsetRes + 1) * ratio);
-      let sum = 0, count = 0;
-      for (let i = offsetBuf; i < nextOffsetBuf && i < buffer.length; i++) { sum += buffer[i]; count++; }
-      result[offsetRes] = sum / Math.max(count, 1);
-      offsetRes++; offsetBuf = nextOffsetBuf;
-    }
-    return floatTo16BitPCM(result);
-  }
+          const combined = (wave1 + wave2 + wave3) / 3;
+          const height = baseHeight + combined * maxHeight;
+          const opacity = 0.5 + combined * 0.5;
 
-  async function startMic() {
-    try {
-      pauseSending = false;
-      openWS();
+          bar.style.height = `${height}px`;
+          bar.style.opacity = opacity;
 
-      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      source = audioContext.createMediaStreamSource(mediaStream);
+          if (isSpeaking) {
+            bar.classList.add('speaking');
+          } else {
+            bar.classList.remove('speaking');
+          }
+        });
 
-      processor = audioContext.createScriptProcessor(4096, 1, 1);
-      const sampleRate = audioContext.sampleRate;
+        waveAnimationFrame = requestAnimationFrame(animateWaveform);
+      }
 
-      processor.onaudioprocess = (e) => {
-        if (!ws || ws.readyState !== WebSocket.OPEN || pauseSending) return;
-        const inputData = e.inputBuffer.getChannelData(0);
-        ws.send(downsampleBuffer(inputData, sampleRate, 16000));
-      };
+      function stopWaveformAnimation() {
+        if (waveAnimationFrame) {
+          cancelAnimationFrame(waveAnimationFrame);
+          waveAnimationFrame = null;
+        }
+        waveBars.forEach(bar => {
+          bar.style.height = '4px';
+          bar.style.opacity = '0.4';
+          bar.classList.remove('speaking');
+        });
+      }
 
-      source.connect(processor);
-      processor.connect(audioContext.destination);
+      function updateUI() {
+        if (isSpeaking) {
+          statusText.textContent = 'Assistant Speaking';
+          micHint.textContent = 'Assistant is responding...';
+        } else if (isListening) {
+          statusText.textContent = 'Listening...';
+          micHint.textContent = 'Tap to stop listening';
+        } else if (ws && ws.readyState === WebSocket.OPEN) {
+          statusText.textContent = 'Connected';
+          micHint.textContent = 'Tap to start voice command';
+        } else {
+          statusText.textContent = 'Connecting...';
+          micHint.textContent = 'Waiting for connection...';
+        }
 
-      startBtn.disabled = true;
-      stopBtn.disabled = false;
-      log("[Mic] Started streaming to backend");
-    } catch (err) {
-      console.error("startMic error", err);
-      log("[Mic] Error: " + (err.message || err));
-    }
-  }
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          statusDot.className = 'status-dot connected';
+        } else {
+          statusDot.className = 'status-dot disconnected';
+        }
 
-  function stopMic() {
-    if (processor) { try { processor.disconnect(); } catch{} processor.onaudioprocess=null; processor=null; }
-    if (source) { try { source.disconnect(); } catch{} source=null; }
-    if (audioContext) { audioContext.close(); audioContext=null; }
-    if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream=null; }
-    startBtn.disabled = false;
-    stopBtn.disabled = true;
-    pauseSending = false;
-    updateStatus();
-    log("[Mic] Stopped");
-  }
+        if (isListening) {
+          micButton.className = 'mic-button listening';
+          micIcon.innerHTML = `
+            <line x1="1" y1="1" x2="23" y2="23"></line>
+            <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"></path>
+            <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"></path>
+            <line x1="12" y1="19" x2="12" y2="23"></line>
+            <line x1="8" y1="23" x2="16" y2="23"></line>
+          `;
+          pulseRing.classList.add('active');
+          pulseRing2.classList.add('active');
+          pulseRing3.classList.add('active');
+          orbContainer.classList.add('active');
+          waveformContainer.classList.add('active');
+          animateWaveform();
+        } else {
+          micButton.className = 'mic-button idle';
+          micIcon.innerHTML = `
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" y1="19" x2="12" y2="23"></line>
+            <line x1="8" y1="23" x2="16" y2="23"></line>
+          `;
+          pulseRing.classList.remove('active');
+          pulseRing2.classList.remove('active');
+          pulseRing3.classList.remove('active');
+          if (!isSpeaking) {
+            orbContainer.classList.remove('active');
+            waveformContainer.classList.remove('active');
+            stopWaveformAnimation();
+          }
+        }
 
-  startBtn.onclick = startMic;
-  stopBtn.onclick = stopMic;
+        if (isSpeaking) {
+          orbContainer.classList.add('active');
+          waveformContainer.classList.add('active');
+          if (!waveAnimationFrame) {
+            animateWaveform();
+          }
+        }
+      }
 
-  log("Ready. Click 'Start Mic' and speak commands like 'open notepad', 'open browser', or 'what time is it'.");
-})();
-</script>
+      function scrollToBottom() {
+        setTimeout(() => {
+          conversationBody.scrollTo({
+            top: conversationBody.scrollHeight,
+            behavior: 'smooth'
+          });
+        }, 50);
+      }
+
+      function addMessage(type, text) {
+        emptyState.style.display = 'none';
+
+        const container = document.createElement('div');
+        container.className = `message-container ${type}`;
+
+        const message = document.createElement('div');
+        message.className = `message ${type}`;
+        message.textContent = text;
+
+        container.appendChild(message);
+        conversationBody.appendChild(container);
+
+        scrollToBottom();
+      }
+
+      function openWebSocket() {
+        if (ws && ws.readyState === WebSocket.OPEN) return;
+
+        ws = new WebSocket(WS_URL);
+        ws.binaryType = "arraybuffer";
+
+        ws.onopen = () => {
+          console.log('Connected to backend');
+          updateUI();
+        };
+
+        ws.onmessage = (ev) => {
+          try {
+            const obj = JSON.parse(ev.data);
+            if (obj.partial && obj.partial.trim()) {
+              partialTextEl.textContent = obj.partial;
+            }
+            if (obj.text && obj.text.trim()) {
+              addMessage('user', obj.text);
+              partialTextEl.textContent = '';
+            }
+            if (obj.response && obj.response.trim()) {
+              addMessage('assistant', obj.response);
+
+              pauseSending = true;
+              isSpeaking = true;
+              updateUI();
+
+              const utter = new SpeechSynthesisUtterance(obj.response);
+              utter.rate = 1;
+              utter.onend = () => {
+                pauseSending = false;
+                isSpeaking = false;
+                updateUI();
+              };
+              speechSynthesis.speak(utter);
+            }
+          } catch (e) {
+            console.error("Non-JSON message", e);
+          }
+        };
+
+        ws.onclose = () => {
+          console.log('Disconnected');
+          pauseSending = false;
+          ws = null;
+          updateUI();
+          setTimeout(openWebSocket, 1000);
+        };
+
+        ws.onerror = (err) => {
+          console.error("WebSocket error", err);
+          ws.close();
+        };
+      }
+
+      function floatTo16BitPCM(floatBuffer) {
+        const l = floatBuffer.length;
+        const buffer = new ArrayBuffer(l * 2);
+        const view = new DataView(buffer);
+        let offset = 0;
+        for (let i = 0; i < l; i++, offset += 2) {
+          let s = Math.max(-1, Math.min(1, floatBuffer[i]));
+          view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+        }
+        return buffer;
+      }
+
+      function downsampleBuffer(buffer, sampleRate, outSampleRate = 16000) {
+        if (outSampleRate === sampleRate) return floatTo16BitPCM(buffer);
+        const ratio = sampleRate / outSampleRate;
+        const newLength = Math.round(buffer.length / ratio);
+        const result = new Float32Array(newLength);
+        let offsetRes = 0, offsetBuf = 0;
+        while (offsetRes < result.length) {
+          const nextOffsetBuf = Math.round((offsetRes + 1) * ratio);
+          let sum = 0, count = 0;
+          for (let i = offsetBuf; i < nextOffsetBuf && i < buffer.length; i++) {
+            sum += buffer[i];
+            count++;
+          }
+          result[offsetRes] = sum / Math.max(count, 1);
+          offsetRes++;
+          offsetBuf = nextOffsetBuf;
+        }
+        return floatTo16BitPCM(result);
+      }
+
+      async function startMicrophone() {
+        try {
+          pauseSending = false;
+          openWebSocket();
+
+          mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          source = audioContext.createMediaStreamSource(mediaStream);
+          processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+          const sampleRate = audioContext.sampleRate;
+
+          processor.onaudioprocess = (e) => {
+            if (!ws || ws.readyState !== WebSocket.OPEN || pauseSending) return;
+            const inputData = e.inputBuffer.getChannelData(0);
+            ws.send(downsampleBuffer(inputData, sampleRate, 16000));
+          };
+
+          source.connect(processor);
+          processor.connect(audioContext.destination);
+
+          isListening = true;
+          updateUI();
+        } catch (err) {
+          console.error("Microphone error", err);
+          alert("Microphone access denied. Please allow microphone access.");
+        }
+      }
+
+      function stopMicrophone() {
+        if (processor) {
+          try { processor.disconnect(); } catch (e) {}
+          processor.onaudioprocess = null;
+          processor = null;
+        }
+        if (source) {
+          try { source.disconnect(); } catch (e) {}
+          source = null;
+        }
+        if (audioContext) {
+          audioContext.close();
+          audioContext = null;
+        }
+        if (mediaStream) {
+          mediaStream.getTracks().forEach(t => t.stop());
+          mediaStream = null;
+        }
+        pauseSending = false;
+        isListening = false;
+        partialTextEl.textContent = '';
+        updateUI();
+      }
+
+      micButton.addEventListener('click', () => {
+        if (isListening) {
+          stopMicrophone();
+        } else {
+          startMicrophone();
+        }
+      });
+
+      initWaveform();
+      openWebSocket();
+    })();
+  </script>
 </body>
 </html>
