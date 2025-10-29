@@ -1,15 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voice Assistant</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    /* === YOUR ORIGINAL CSS KEPT EXACTLY AS BEFORE === */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -513,27 +510,48 @@
       border-bottom-left-radius: 4px;
     }
 
+    /* === NEW: chat input styles (minimal and consistent with UI) === */
+    .chat-input {
+      margin-top: 12px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+    }
+
+    #chatText {
+      flex: 1;
+      max-width: 840px;
+      padding: 12px 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(255,255,255,0.02);
+      color: #e6eef8;
+      font-size: 15px;
+      outline: none;
+    }
+
+    #sendBtn {
+      padding: 10px 18px;
+      border-radius: 999px;
+      border: none;
+      background: linear-gradient(90deg, #00c6ff, #0072ff);
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    #sendBtn:hover {
+      filter: brightness(0.95);
+    }
+
     @media (max-width: 768px) {
-      .title {
-        font-size: 40px;
-      }
-
-      .mic-button {
-        width: 120px;
-        height: 120px;
-      }
-
-      .waveform {
-        width: 280px;
-      }
-
-      .conversation-body {
-        height: 320px;
-      }
-
-      .message {
-        max-width: 85%;
-      }
+      .title { font-size: 40px; }
+      .mic-button { width: 120px; height: 120px; }
+      .waveform { width: 280px; }
+      .conversation-body { height: 320px; }
+      .message { max-width: 85%; }
     }
   </style>
 </head>
@@ -594,6 +612,13 @@
         </div>
       </div>
     </div>
+
+    <!-- ===== NEW: chat input (minimal, integrated) ===== -->
+    <div class="chat-input">
+      <input id="chatText" type="text" placeholder="Type your command here..." />
+      <button id="sendBtn">Send</button>
+    </div>
+
   </div>
 
   <script>
@@ -615,6 +640,9 @@
       const conversationBody = document.getElementById('conversationBody');
       const emptyState = document.getElementById('emptyState');
 
+      const chatText = document.getElementById('chatText');
+      const sendBtn = document.getElementById('sendBtn');
+
       let ws = null;
       let mediaStream = null;
       let audioContext = null;
@@ -625,6 +653,7 @@
       let isSpeaking = false;
       let waveBars = [];
       let waveAnimationFrame = null;
+      let lastSentText = null;
 
       function initWaveform() {
         waveformContainer.innerHTML = '';
@@ -787,16 +816,27 @@
         ws.onmessage = (ev) => {
           try {
             const obj = JSON.parse(ev.data);
+
+            // live partial transcription
             if (obj.partial && obj.partial.trim()) {
               partialTextEl.textContent = obj.partial;
             }
+
+            // final recognized text (from audio) or echo text
             if (obj.text && obj.text.trim()) {
-              addMessage('user', obj.text);
+              // Only add message if it's NOT the one we just sent
+              if (obj.text !== lastSentText) {
+                addMessage('user', obj.text);
+              }
+              lastSentText = null;
               partialTextEl.textContent = '';
             }
+
+            // assistant response
             if (obj.response && obj.response.trim()) {
               addMessage('assistant', obj.response);
 
+              // pause sending audio while assistant speaks
               pauseSending = true;
               isSpeaking = true;
               updateUI();
@@ -825,7 +865,7 @@
 
         ws.onerror = (err) => {
           console.error("WebSocket error", err);
-          ws.close();
+          try { ws.close(); } catch (e) {}
         };
       }
 
@@ -922,8 +962,30 @@
         }
       });
 
+      // === Chat (typed input) integration ===
+      function sendTypedChat() {
+        const text = chatText.value.trim();
+        if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+        // Store the text to prevent duplication
+        lastSentText = text;
+
+        // show immediately in UI
+        addMessage('user', text);
+        // send to backend as JSON so backend recognizes typed input
+        ws.send(JSON.stringify({ type: "text", text }));
+        chatText.value = "";
+      }
+
+      sendBtn.addEventListener('click', sendTypedChat);
+      chatText.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') sendTypedChat();
+      });
+
+      // Initialize
       initWaveform();
       openWebSocket();
+      updateUI();
     })();
   </script>
 </body>
