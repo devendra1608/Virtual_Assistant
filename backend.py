@@ -144,6 +144,11 @@ def parse_intent(text):
     # --- System info ---
     if any(x in t for x in ["system specification", "system info", "specs"]):
         return "system_specs", None
+    
+    # --- Screenshot ---
+    if any(x in t for x in ["screenshot", "take screenshot", "capture screen", "take a picture of screen"]):
+        return "take_screenshot", None
+
 
     # --- Internet speed ---
     if any(x in t for x in [
@@ -224,6 +229,9 @@ def perform_action(intent, param):
 
         elif intent == "system_specs":
             return get_system_specs()
+        
+        elif intent == "take_screenshot":
+            return take_screenshot()
 
     except Exception as e:
         return f"Error performing action: {e}"
@@ -250,6 +258,30 @@ def get_joke():
         "Why do Java developers wear glasses? Because they don’t see sharp.",
     ]
     return random.choice(fallback_jokes)
+
+def take_screenshot():
+    try:
+        import pyautogui
+        from datetime import datetime
+
+        # Path to your original Screenshots folder
+        save_dir = r"C:\Users\kolli\OneDrive\Pictures\Screenshots"
+
+        # Ensure folder exists
+        os.makedirs(save_dir, exist_ok=True)
+
+        # Create filename with timestamp
+        now = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        save_path = os.path.join(save_dir, f"screenshot_{now}.png")
+
+        # Capture and save screenshot
+        screenshot = pyautogui.screenshot()
+        screenshot.save(save_path)
+
+        return f"✅ Screenshot saved to {save_path}"
+    except Exception as e:
+        return f"Error taking screenshot: {e}"
+
 
 # ---------------- INTERNET SPEED TEST ----------------
 def check_internet_speed():
