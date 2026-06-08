@@ -1,0 +1,6 @@
+
+
+MODEL_PATH = "vosk-model-en-us-0.22"
+SAMPLE_RATE = 16000
+HOST = "127.0.0.1"
+PORT = 8000
