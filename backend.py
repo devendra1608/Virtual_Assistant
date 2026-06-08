@@ -111,6 +111,9 @@ def parse_intent(text):
             "excel": "excel",
             "powerpoint": "powerpoint",
             "power point": "powerpoint",
+            "spotify": "spotify",
+            "microsoft store": "store",
+            "store": "store"
         }
     
     # --- OPEN commands ---
@@ -162,7 +165,16 @@ def perform_action(intent, param):
                 "word": ["cmd", "/c", "start", "winword"],
                 "excel": ["cmd", "/c", "start", "excel"],
                 "powerpoint": ["cmd", "/c", "start", "powerpnt"],
+                "spotify": ["cmd", "/c", "start", "spotify:"],
+                "store": ["cmd", "/c", "start", "ms-windows-store:"],
             }
+            if param in open_map:
+                subprocess.Popen(open_map[param])
+                return f"Opened {param.title()}."
+        elif intent == "open_app":
+            if param in open_map:
+                subprocess.Popen(open_map[param])
+                return f"Opened {param.title()}."
             if param in open_map:
                 subprocess.Popen(open_map[param])
                 return f"Opened {param.title()}."
@@ -244,6 +256,8 @@ def close_application(app_name):
         "word": ["winword.exe"],
         "excel": ["excel.exe"],
         "powerpoint": ["powerpnt.exe"],
+        "spotify": ["spotify.exe"],
+        "store": ["WinStore.App.exe", "WindowsStore.exe"],
     }.get(app_name)
     if not targets:
         return False
